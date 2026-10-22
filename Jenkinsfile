@@ -1,26 +1,25 @@
 pipeline {
     agent any
     tools {
-        jdk 'Jdk-17'    // Must match the name configured in Global Tools
-        maven 'mvn-3.6'  // Must match the name configured in Global Tools
+        jdk 'java-17'
+        maven 'maven-3.9'
     }
 
     stages {
-
-       stage('mvn compile') {
+        stage('git clone') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Nallamekala-SivaBrahmaiah/Boardgame.git'
+            }
+        }
+        stage('maven compile') {
             steps {
                 sh 'mvn compile'
             }
         }
-       stage('mvn test') {
-            steps {
-                sh 'mvn test'
-            }
-        }
-       stage('mvn pkg') {
+        stage('maven package') {
             steps {
                 sh 'mvn package'
             }
-        }                
+        }         
     }
 }
