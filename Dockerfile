@@ -1,11 +1,19 @@
-FROM adoptopenjdk/openjdk11 
-        
-EXPOSE 8081
- 
-ENV APP_HOME /usr/src/app 
 
-COPY target/*.jar $APP_HOME/app.jar
+FROM maven:3.9-eclipse-temurin-11 AS build
 
-WORKDIR $APP_HOME
+WORKDIR /app
 
-CMD ["java", "-jar", "app.jar"]
+COPY pom.xml .
+COPY src ./src
+
+RUN mvn clean package -DskipTests
+
+FROM eclipse-temurin:11-jre
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
