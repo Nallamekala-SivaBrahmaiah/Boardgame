@@ -1,3 +1,4 @@
+
 pipeline {
     agent any
 
@@ -65,19 +66,19 @@ pipeline {
                 '''
             }
         }
-    }
 
-    post {
-        always {
-            sh 'docker logout || true'
-        }
+        stage('Docker Run') {
+            steps {
+                sh '''
+                    docker rm -f boardgame-app 2>/dev/null || true
 
-        success {
-            echo 'SUCCESS: Boardgame image pushed to Docker Hub!'
-        }
-
-        failure {
-            echo 'FAILED: Check Jenkins Console Output.'
+                    docker run -d \
+                        --name boardgame-app \
+                        --restart unless-stopped \
+                        -p 8081:8080 \
+                        $DOCKER_IMAGE:$BUILD_NUMBER
+                '''
+            }
         }
     }
 }
