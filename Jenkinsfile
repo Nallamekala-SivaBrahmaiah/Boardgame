@@ -3,12 +3,14 @@ pipeline {
     agent any
 
     tools {
-        jdk 'java-17'
-        maven 'maven-3.9'
+        maven 'maven3'
+        jdk 'jdk17'
     }
 
     environment {
         DOCKER_IMAGE = 'nsbyadav14e/boardgame'
+        ACR_LOGIN_SERVER = 'nsbyadav1434567.azurecr.io'
+        ACR_IMAGE = 'boardgame'
     }
 
     stages {
@@ -20,19 +22,25 @@ pipeline {
             }
         }
 
-        stage('Maven Compile') {
+        stage('Compile') {
             steps {
                 sh 'mvn compile'
             }
         }
 
-        stage('Maven Package') {
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Build') {
             steps {
                 sh 'mvn package -DskipTests'
             }
         }
 
-        stage('Docker Login') {
+        stage('Docker Hub Login') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
@@ -40,6 +48,7 @@ pipeline {
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
                     sh '''
+                        set +x
                         echo "$DOCKER_PASS" | docker login \
                             --username "$DOCKER_USER" \
                             --password-stdin
@@ -58,64 +67,12 @@ pipeline {
             }
         }
 
-        stage('Docker Push') {
+        stage('Push to Docker Hub') {
             steps {
                 sh '''
                     docker push $DOCKER_IMAGE:$BUILD_NUMBER
                     docker push $DOCKER_IMAGE:latest
                 '''
-            }
-        }
-
-        stage('Docker Run') {
-            steps {
-                sh '''
-                    docker rm -f boardgame-app 2>/dev/null || true
-
-                    docker run -d \
-                        --name boardgame-app \
-                        --restart unless-stopped \
-                        -p 8081:8080 \
-                        $DOCKER_IMAGE:$BUILD_NUMBER
-                '''
-            }
-        }
-    }
-}
----
-
-pipeline {
-    agent any
-
-    tools {
-        jdk 'java-17'
-        maven 'maven-3.9'
-    }
-
-    environment {
-        ACR_LOGIN_SERVER = 'nsbyadav1434567.azurecr.io'
-        IMAGE_NAME = 'boardgame'
-        CONTAINER_NAME = 'boardgame-app'
-    }
-
-    stages {
-
-        stage('Git Checkout') {
-            steps {
-                git branch: 'main',
-                    url: 'https://github.com/Nallamekala-SivaBrahmaiah/Boardgame.git'
-            }
-        }
-
-        stage('Maven Compile') {
-            steps {
-                sh 'mvn compile'
-            }
-        }
-
-        stage('Maven Package') {
-            steps {
-                sh 'mvn package -DskipTests'
             }
         }
 
@@ -137,35 +94,17 @@ pipeline {
             }
         }
 
-        stage('Docker Build') {
+        stage('Push to Azure ACR') {
             steps {
                 sh '''
-                    docker build \
-                        -t $ACR_LOGIN_SERVER/$IMAGE_NAME:$BUILD_NUMBER \
-                        -t $ACR_LOGIN_SERVER/$IMAGE_NAME:latest .
-                '''
-            }
-        }
+                    docker tag $DOCKER_IMAGE:$BUILD_NUMBER \
+                        $ACR_LOGIN_SERVER/$ACR_IMAGE:$BUILD_NUMBER
 
-        stage('Docker Push') {
-            steps {
-                sh '''
-                    docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$BUILD_NUMBER
-                    docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:latest
-                '''
-            }
-        }
+                    docker tag $DOCKER_IMAGE:latest \
+                        $ACR_LOGIN_SERVER/$ACR_IMAGE:latest
 
-        stage('Docker Run') {
-            steps {
-                sh '''
-                    docker rm -f $CONTAINER_NAME 2>/dev/null || true
-
-                    docker run -d \
-                        --name $CONTAINER_NAME \
-                        --restart unless-stopped \
-                        -p 8081:8080 \
-                        $ACR_LOGIN_SERVER/$IMAGE_NAME:$BUILD_NUMBER
+                    docker push $ACR_LOGIN_SERVER/$ACR_IMAGE:$BUILD_NUMBER
+                    docker push $ACR_LOGIN_SERVER/$ACR_IMAGE:latest
                 '''
             }
         }
